@@ -14,23 +14,21 @@ RUN apt-get update -qq
 # Dependencies to execute Android builds
 RUN dpkg --add-architecture i386
 RUN apt-get update -qq
-RUN DEBIAN_FRONTEND=noninteractive apt-get install -y wget unzip libc6:i386 libstdc++6:i386 libgcc1:i386 libncurses5:i386 libz1:i386
+RUN DEBIAN_FRONTEND=noninteractive apt-get install -y wget zip unzip libc6:i386 libstdc++6:i386 libgcc1:i386 libncurses5:i386 libz1:i386 && \
+	apt-get clean  && \
+    rm -rf /var/lib/apt/lists/*
 
 RUN \
     echo "===> add webupd8 repository..."  && \
     echo "deb http://ppa.launchpad.net/webupd8team/java/ubuntu trusty main" | tee /etc/apt/sources.list.d/webupd8team-java.list  && \
     echo "deb-src http://ppa.launchpad.net/webupd8team/java/ubuntu trusty main" | tee -a /etc/apt/sources.list.d/webupd8team-java.list  && \
     apt-key adv --keyserver keyserver.ubuntu.com --recv-keys EEA14886  && \
-    apt-get update
-
-
-RUN echo "===> install Java"  && \
+    apt-get update && \
+    echo "===> install Java"  && \
     echo debconf shared/accepted-oracle-license-v1-1 select true | debconf-set-selections  && \
     echo debconf shared/accepted-oracle-license-v1-1 seen true | debconf-set-selections  && \
-    DEBIAN_FRONTEND=noninteractive  apt-get install -y --force-yes oracle-java8-installer oracle-java8-set-default
-
-
-RUN echo "===> clean up..."  && \
+    DEBIAN_FRONTEND=noninteractive  apt-get install -y --force-yes oracle-java8-installer oracle-java8-set-default && \
+	echo "===> clean up..."  && \
     rm -rf /var/cache/oracle-jdk8-installer  && \
     apt-get clean  && \
     rm -rf /var/lib/apt/lists/*
@@ -66,9 +64,7 @@ RUN echo y | android update sdk --no-ui --all --filter android-25 | grep 'packag
 RUN echo y | android update sdk --no-ui --all --filter android-24 | grep 'package installed'
 RUN echo y | android update sdk --no-ui --all --filter android-23 | grep 'package installed'
 RUN echo y | android update sdk --no-ui --all --filter android-22 | grep 'package installed'
-RUN echo y | android update sdk --no-ui --all --filter android-21 | grep 'package installed'
 RUN echo y | android update sdk --no-ui --all --filter android-19 | grep 'package installed'
-RUN echo y | android update sdk --no-ui --all --filter android-15 | grep 'package installed'
 
 # build tools
 # Please keep these in descending order!
@@ -77,7 +73,6 @@ RUN echo y | android update sdk --no-ui --all --filter build-tools-25.0.1 | grep
 RUN echo y | android update sdk --no-ui --all --filter build-tools-24.0.3 | grep 'package installed'
 RUN echo y | android update sdk --no-ui --all --filter build-tools-23.0.3 | grep 'package installed'
 RUN echo y | android update sdk --no-ui --all --filter build-tools-22.0.1 | grep 'package installed'
-RUN echo y | android update sdk --no-ui --all --filter build-tools-21.1.2 | grep 'package installed'
 RUN echo y | android update sdk --no-ui --all --filter build-tools-19.1.0 | grep 'package installed'
 
 # Android System Images, for emulators
@@ -92,34 +87,44 @@ RUN echo y | android update sdk --no-ui --all --filter build-tools-19.1.0 | grep
 # Extras
 RUN echo y | android update sdk --no-ui --all --filter extra-android-m2repository | grep 'package installed'
 RUN echo y | android update sdk --no-ui --all --filter extra-google-m2repository | grep 'package installed'
-RUN echo y | android update sdk --no-ui --all --filter extra-android-support | grep 'package installed'
+# RUN echo y | android update sdk --no-ui --all --filter extra-android-support | grep 'package installed'
 RUN echo y | android update sdk --no-ui --all --filter extra-google-google_play_services | grep 'package installed'
 
 # google apis
 # Please keep these in descending order!
 RUN echo y | android update sdk --no-ui --all --filter addon-google_apis-google-23 | grep 'package installed'
 RUN echo y | android update sdk --no-ui --all --filter addon-google_apis-google-22 | grep 'package installed'
-RUN echo y | android update sdk --no-ui --all --filter addon-google_apis-google-21 | grep 'package installed'
+
+SHELL ["/bin/bash", "--login", "-c"]
+
+# ENV SDKMAN_DIR /usr/local/sdkman
+
+# SDK Manager
+RUN curl -s "https://get.sdkman.io" | bash && \
+ 	source "$HOME/.sdkman/bin/sdkman-init.sh"
 
 
 # ------------------------------------------------------
 # --- Install Gradle from PPA
 
 # Gradle PPA
-RUN apt-get update
-RUN apt-get -y install gradle
+RUN source "/root/.sdkman/bin/sdkman-init.sh" && sdk install gradle 2.14.1
+# RUN apt-get update
+# RUN apt-get -y install gradle
 RUN gradle -v
 
-# ------------------------------------------------------
-# --- Install Maven 3 from PPA
+# # ------------------------------------------------------
+# # --- Install Maven 3 from PPA
 
-RUN apt-get purge maven maven2
-RUN apt-get update
-RUN apt-get -y install maven
-RUN mvn --version
+# RUN apt-get purge maven maven2
+# RUN apt-get update
+# RUN apt-get -y install maven
+# RUN mvn --version
 
 # ------------------------------------------------------
 # --- Install Fastlane
+
+SHELL ["/bin/sh", "-c"]
 
 RUN gem install fastlane --no-document
 RUN fastlane --version
@@ -147,12 +152,6 @@ RUN fastlane --version
 
 # RUN /usr/bin/gcloud config set --installation core/disable_usage_reporting true
 # RUN sed -i -- 's/\"disable_usage_reporting\": false/\"disable_usage_reporting\": true/g' $GCLOUD_SDK_CONFIG
-
-# ------------------------------------------------------
-# --- Cleanup and rev num
-
-# Cleaning
-RUN apt-get clean
 
 # ENV BITRISE_DOCKER_REV_NUMBER_ANDROID v2016_12_13_1
 # CMD bitrise -version
